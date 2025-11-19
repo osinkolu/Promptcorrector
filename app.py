@@ -321,7 +321,7 @@ else:
             st.write(st.session_state.text_data["CreatorName"])
 
             st.write("### Review Actions")
-            action = st.radio("Choose Action", [ "Edit", "Approve"])# [ "Edit", "Approve", "Reject"]
+            action = st.radio("Choose Action", [ "Edit", "Approve","Reject" ])# [ "Edit", "Approve", "Reject"]
             with st.expander("Listen to the audio prompt", expanded=True):
                 file_path = st.session_state.text_data["Audio_link"]
                 st.audio(file_path, format="audio/mp3", autoplay=True)
