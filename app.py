@@ -2,7 +2,7 @@ import streamlit as st
 from firebase_admin import credentials, firestore, initialize_app, _apps
 import json
 import os
-# import dotenv
+import dotenv
 from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,10 +11,11 @@ from utils import light_tagger, tag, reverse_tag
 import random
 
 
-# dotenv.load_dotenv()
+dotenv.load_dotenv()
 
 openai_api_key = os.environ['openai_key']
 emotions = ["Happy", "Sad", "Angry", "Neutral", "Surprised", "Fearful", "Disgusted"]
+nameofcollection = "stage_thirtyn_reviews"
 
 
 # Initialize Firebase if it hasn't been initialized yet
@@ -28,7 +29,7 @@ db = firestore.client()
 # Function to load the next review item from a batch of 20 random documents
 def load_next_text():
     # Fetch a batch of 20 documents where Status is "pending"
-    docs = db.collection("stage_four_reviews").where("Status", "==", "pending").limit(20).stream()
+    docs = db.collection(nameofcollection).where("Status", "==", "pending").limit(20).stream()
 
     # Convert Firestore documents to a list
     doc_list = [doc for doc in docs]
@@ -47,16 +48,16 @@ def load_next_text():
 # Function to save the review decision
 def save_review(doc_id, review_data):
     review_data["Timestamp"] = datetime.utcnow()  # Add a timestamp to the review
-    db.collection("stage_four_reviews").document(doc_id).update(review_data)
+    db.collection(nameofcollection).document(doc_id).update(review_data)
 
 # Function to get the count of reviews done by the reviewer
 def get_review_count(username):
-    docs = db.collection("stage_four_reviews").where("reviewer", "==", username).stream()
+    docs = db.collection(nameofcollection).where("reviewer", "==", username).stream()
     return sum(1 for _ in docs)
 
 # Function to get the history of prompts reviewed by the user
 def get_review_history(username, limit):
-    docs = db.collection("stage_four_reviews").where("reviewer", "==", username).stream()
+    docs = db.collection(nameofcollection).where("reviewer", "==", username).stream()
     history = []
     for doc in docs:
         data = doc.to_dict()
@@ -77,14 +78,14 @@ def get_review_history(username, limit):
 
 # Function to update a specific review
 def update_review(doc_id, edited_text):
-    db.collection("stage_four_reviews").document(doc_id).update({
+    db.collection(nameofcollection).document(doc_id).update({
         "reviewed_text": edited_text,
         "Timestamp": datetime.utcnow(),
         "Status": "edit"
     })
 
 def undo_review(doc_id):
-    db.collection("stage_four_reviews").document(doc_id).update({
+    db.collection(nameofcollection).document(doc_id).update({
         "Timestamp": datetime.utcnow(),
         "Status": "pending",
         "reviewer": None
@@ -92,7 +93,7 @@ def undo_review(doc_id):
 
 # Function to fetch review data for analytics
 def fetch_review_data():
-    docs = db.collection("stage_four_reviews").stream()
+    docs = db.collection(nameofcollection).stream()
     data = []
     for doc in docs:
         record = doc.to_dict()
@@ -320,13 +321,16 @@ else:
             st.write(st.session_state.text_data["CreatorName"])
 
             st.write("### Review Actions")
-            action = st.radio("Choose Action", ["Approve", "Edit", "Reject"])
+            action = st.radio("Choose Action", [ "Edit", "Approve"])# [ "Edit", "Approve", "Reject"]
+            with st.expander("Listen to the audio prompt", expanded=True):
+                file_path = st.session_state.text_data["Audio_link"]
+                st.audio(file_path, format="audio/mp3", autoplay=True)
            
-            # Emotion multi-select dropdown
-            selected_emotions = st.multiselect(
+            # Emotion single-select dropdown
+            selected_emotions = st.selectbox(
                         "Select the emotions in which this sentence should be read",
                         emotions,
-                        default=['Neutral']  # Default to no emotions selected
+                        index=emotions.index('Neutral')  # Default to 'Neutral'
                     )
 
 
@@ -425,7 +429,7 @@ else:
             review_data = review_data[(review_data["reviewer"] != "unreviewed") & (review_data["Status"] != "reject")]
             status_count = review_data.groupby(['reviewer', 'Status']).size().unstack(fill_value=0)
             try:
-                status_count["sum"] = status_count["approve"] + status_count["edit"]
+                status_count["sum"] =  status_count["edit"]
             except:
                 status_count["sum"] = status_count["approve"]
             status_count = status_count.sort_values(by="sum").drop("sum", axis=1)
@@ -540,7 +544,7 @@ else:
                                 "domain": data_row["domain"],
                                 "pulled": data_row["pulled"]
                             }
-                            db.collection("stage_four_reviews").document(doc_id).set(data)
+                            db.collection(nameofcollection).document(doc_id).set(data)
 
                             # Update progress bar
                             progress = int((index / total_rows) * 100)
