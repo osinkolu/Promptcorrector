@@ -2,7 +2,7 @@ import streamlit as st
 from firebase_admin import credentials, firestore, initialize_app, _apps
 import json
 import os
-# import dotenv
+import dotenv
 from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,11 +11,12 @@ from utils import light_tagger, tag, reverse_tag
 import random
 
 
-# dotenv.load_dotenv()
+dotenv.load_dotenv()
 
 openai_api_key = os.environ['openai_key']
 emotions = ["Happy", "Sad", "Angry", "Neutral", "Surprised", "Fearful", "Disgusted"]
 nameofcollection = "stage_thirtyn_reviews"
+domanins = ['general', 'family', 'technology', 'education', 'politics', 'health', 'law', 'tourism','agriculture', 'sports']
 
 
 # Initialize Firebase if it hasn't been initialized yet
@@ -70,7 +71,8 @@ def get_review_history(username, limit):
                 "Status": data.get("Status"),
                 "Timestamp": data.get("Timestamp"),
                 "language_tags":data.get("language_tags"),
-                "emotions": data.get("emotions")
+                "emotions": data.get("emotions"),
+                "domain": data.get("domain")
             })
     # Sort history by Timestamp in descending order and limit results
     sorted_history = sorted(history, key=lambda x: x["Timestamp"], reverse=True)
@@ -332,7 +334,12 @@ else:
                         emotions,
                         index=emotions.index('Neutral')  # Default to 'Neutral'
                     )
-
+            doamin_index = domanins.index(str(st.session_state.text_data["domain"]).lower()) if str(st.session_state.text_data["domain"]).lower() in domanins else 0
+            selected_domain = st.selectbox(
+                "Select the domain for this sentence",
+                domanins,
+                index=doamin_index  # Default to the domain from the text data or 'general'
+            )
 
             # If the reviewer chooses "Edit", allow them to modify the text
             if action == "Edit":
@@ -351,7 +358,8 @@ else:
                     "reviewer": st.session_state.username,
                     "reviewed_text": edited_text if action == "Edit" else st.session_state.text_data["CodeSwitchedText"],
                     "emotions": selected_emotions,
-                    "language_tags": tag(st.session_state.word_tags)
+                    "language_tags": tag(st.session_state.word_tags),
+                    "domain": selected_domain.title()
                 }
                 save_review(st.session_state.doc_id, review_data)
 
@@ -383,6 +391,7 @@ else:
                 st.write(f"**Emotions:** {record['emotions']}")
                 st.write(f"**Status:** {record['Status']}")
                 st.write(f"**Timestamp:** {record['Timestamp']}")
+                st.write(f"**Domain:** {record['domain']}")
 
                 # # Option to edit the record
                 # if st.button(f"Edit Review - {record['doc_id']}"):
