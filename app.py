@@ -2,7 +2,7 @@ import streamlit as st
 from firebase_admin import credentials, firestore, initialize_app, _apps
 import json
 import os
-import dotenv
+# import dotenv
 from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,7 +11,7 @@ from utils import light_tagger, tag, reverse_tag
 import random
 
 
-dotenv.load_dotenv()
+# dotenv.load_dotenv()
 
 openai_api_key = os.environ['openai_key']
 emotions = ["Happy", "Sad", "Angry", "Neutral", "Surprised", "Fearful", "Disgusted"]
