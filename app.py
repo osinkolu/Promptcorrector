@@ -362,6 +362,7 @@ else:
                     "domain": selected_domain.title()
                 }
                 save_review(st.session_state.doc_id, review_data)
+                update_reflection()
 
                 # Confirmation and auto-reload to fetch the next item
                 st.success("Review submitted!")
