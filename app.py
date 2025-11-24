@@ -15,7 +15,7 @@ import random
 
 openai_api_key = os.environ['openai_key']
 emotions = ["Happy", "Sad", "Angry", "Neutral", "Surprised", "Fearful", "Disgusted"]
-nameofcollection = "stage_thirtyn_reviews"
+nameofcollection = "stage_thirty_reviews"
 domanins = ['general', 'family', 'technology', 'education', 'politics', 'health', 'law', 'tourism','agriculture', 'sports']
 
 
