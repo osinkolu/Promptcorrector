@@ -561,4 +561,4 @@ else:
                             progress_bar.progress(progress)
 
                     st.success("All data uploaded successfully!")
-                    st.session_state.upload_started = False  # Reset the upload state
+                    st.session_state.upload_started = False   # Reset the upload state
