@@ -2,7 +2,7 @@ import streamlit as st
 from firebase_admin import credentials, firestore, initialize_app, _apps
 import json
 import os
-# import dotenv
+import dotenv
 from datetime import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,7 +11,7 @@ from utils import light_tagger, tag, reverse_tag
 import random
 
 
-# dotenv.load_dotenv()
+dotenv.load_dotenv()
 
 openai_api_key = os.environ['openai_key']
 emotions = ["Happy", "Sad", "Angry", "Neutral", "Surprised", "Fearful", "Disgusted"]
@@ -47,9 +47,50 @@ def load_next_text():
         return None, None
 
 # Function to save the review decision
-def save_review(doc_id, review_data):
-    review_data["Timestamp"] = datetime.utcnow()  # Add a timestamp to the review
-    db.collection(nameofcollection).document(doc_id).update(review_data)
+def save_review(doc_id, review_data, original_text_content):
+    """
+    Updates the current document and all other pending documents 
+    that share the same original text.
+    """
+    review_data["Timestamp"] = datetime.utcnow()  # Add a timestamp
+    
+    # Initialize a batch
+    batch = db.batch()
+    count = 0
+    
+    # 1. Add the current document to the batch explicitly 
+    # (in case the query below misses it due to latency or specific filters)
+    current_doc_ref = db.collection(nameofcollection).document(doc_id)
+    batch.update(current_doc_ref, review_data)
+    count += 1
+
+    # 2. Query for ALL pending documents with the same CodeSwitchedText
+    duplicates = db.collection(nameofcollection)\
+        .where("CodeSwitchedText", "==", original_text_content)\
+        .where("Status", "==", "pending")\
+        .stream()
+
+    for doc in duplicates:
+        # Skip the current doc_id because we already added it above
+        if doc.id == doc_id:
+            continue
+            
+        doc_ref = db.collection(nameofcollection).document(doc.id)
+        batch.update(doc_ref, review_data)
+        count += 1
+
+        # Firestore batches allow max 500 operations. 
+        # If we hit 450, commit and restart batch to be safe.
+        if count >= 450:
+            batch.commit()
+            batch = db.batch()
+            count = 0
+
+    # Commit any remaining operations
+    if count > 0:
+        batch.commit()
+        
+    return count # Return count to show the user how much work they saved!
 
 # Function to get the count of reviews done by the reviewer
 def get_review_count(username):
@@ -356,19 +397,27 @@ else:
                 review_data = {
                     "Status": action.lower(),
                     "reviewer": st.session_state.username,
+                    # Logic: If edited, save the edited text. If approved, save the original.
                     "reviewed_text": edited_text if action == "Edit" else st.session_state.text_data["CodeSwitchedText"],
                     "emotions": selected_emotions,
                     "language_tags": tag(st.session_state.word_tags),
                     "domain": selected_domain.title()
                 }
-                save_review(st.session_state.doc_id, review_data)
-                update_reflection()
+                
+                # Get the ORIGINAL text (before edit) to find duplicates
+                original_content_for_query = st.session_state.text_data["CodeSwitchedText"]
+                
+                with st.spinner("Applying review to all duplicates..."):
+                    # Pass the original text to the new function
+                    updated_count = save_review(st.session_state.doc_id, review_data, original_content_for_query)
 
-                # Confirmation and auto-reload to fetch the next item
-                st.success("Review submitted!")
+                # Confirmation
+                st.success(f"Review submitted! You automatically updated {updated_count} duplicate entries.")
+                time.sleep(2) # Give them a second to read the success message
+                
                 st.session_state.word_tags=None
                 st.session_state.text_data = None
-                st.rerun()  # Reloads the app to show the next item
+                st.rerun()
         else:
             st.write("No more texts to review.")
 
@@ -561,4 +610,4 @@ else:
                             progress_bar.progress(progress)
 
                     st.success("All data uploaded successfully!")
-                    st.session_state.upload_started = False   # Reset the upload state
+                    st.session_state.upload_started = False  # Reset the upload state
