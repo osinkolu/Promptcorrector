@@ -42,6 +42,27 @@ def load_next_text():
         doc_id = random_doc.id
         doc_data = random_doc.to_dict()
 
+        # --- NEW CHECK START ---
+        # Before showing this, check if ANY document with this EXACT text 
+        # has already been approved/edited (by someone else just now)
+        already_done = db.collection(nameofcollection)\
+            .where("CodeSwitchedText", "==", doc_data["CodeSwitchedText"].strip())\
+            .where("Status", "in", ["approve", "edit", "reject"])\
+            .limit(1).get()
+            
+        if already_done:
+            # If we found a completed version, update THIS current doc automatically
+            # and skip to the next random one so the user doesn't see it.
+            existing_data = already_done[0].to_dict()
+            db.collection(nameofcollection).document(doc_id).update({
+                "Status": existing_data["Status"],
+                "reviewed_text": existing_data["reviewed_text"],
+                "reviewer": "System-AutoSync",
+                "Timestamp": datetime.utcnow()
+            })
+            return load_next_text() # Recursively look for a truly unreviewed one
+        # --- NEW CHECK END ---
+
         return doc_id, doc_data
     else:
         return None, None
